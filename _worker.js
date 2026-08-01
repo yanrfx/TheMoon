@@ -32,6 +32,9 @@ export default {
       return withSecurityHeaders(response);
     } catch (error) {
       console.error("Unhandled error:", error);
+      if (error instanceof HttpError) {
+        return json({ error: error.message }, error.status);
+      }
       return json({ error: "Terjadi kesalahan pada server." }, 500);
     }
   }
@@ -53,6 +56,10 @@ async function handleApi(request, env, url) {
 
   await ensureSchema(env.DB);
   const setupReady = await ensureMaster(env);
+
+  if (url.pathname === "/api/settings/background" && request.method === "GET") {
+    return getBackgroundSettings(env.DB);
+  }
 
   if (url.pathname === "/api/session" && request.method === "GET") {
     const user = await getSessionUser(request, env.DB);
@@ -82,6 +89,10 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/change-password" && request.method === "POST") {
     return changePassword(request, env.DB, user);
+  }
+
+  if (url.pathname === "/api/settings/background" && request.method === "PUT") {
+    return updateBackgroundSettings(request, env.DB, user);
   }
 
   if (url.pathname === "/api/users" && request.method === "GET") {
@@ -132,9 +143,75 @@ async function ensureSchema(db) {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `),
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`),
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)`)
   ]);
+}
+
+
+async function getBackgroundSettings(db) {
+  const row = await db.prepare(`
+    SELECT value, updated_at
+    FROM app_settings
+    WHERE key = 'background_url'
+    LIMIT 1
+  `).first();
+
+  return json({
+    backgroundUrl: row?.value || "",
+    updatedAt: row?.updated_at || null
+  });
+}
+
+async function updateBackgroundSettings(request, db, sessionUser) {
+  if (!isMaster(sessionUser)) return forbidden();
+
+  const body = await readJson(request);
+  const backgroundUrl = String(body.backgroundUrl || "").trim();
+
+  if (backgroundUrl.length > 2048) {
+    return json({ error: "Link background terlalu panjang." }, 400);
+  }
+
+  if (backgroundUrl) {
+    let parsed;
+    try {
+      parsed = new URL(backgroundUrl);
+    } catch (_) {
+      return json({ error: "Format link background tidak valid." }, 400);
+    }
+
+    if (parsed.protocol !== "https:") {
+      return json({ error: "Link background wajib menggunakan https://." }, 400);
+    }
+  }
+
+  const now = Date.now();
+
+  if (!backgroundUrl) {
+    await db.prepare("DELETE FROM app_settings WHERE key = 'background_url'").run();
+  } else {
+    await db.prepare(`
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES ('background_url', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = excluded.updated_at
+    `).bind(backgroundUrl, now).run();
+  }
+
+  return json({
+    success: true,
+    backgroundUrl,
+    updatedAt: backgroundUrl ? now : null
+  });
 }
 
 async function ensureMaster(env) {
@@ -599,7 +676,7 @@ function withSecurityHeaders(response) {
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   );
   return new Response(response.body, {
     status: response.status,
