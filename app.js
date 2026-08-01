@@ -3,7 +3,8 @@ const state = {
   menus: [],
   currentMenu: "dashboard",
   users: [],
-  confirmAction: null
+  confirmAction: null,
+  backgroundUrl: ""
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -18,6 +19,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindStaticEvents();
+  await loadBackground();
   await restoreSession();
 }
 
@@ -195,6 +197,10 @@ async function navigate(menuId) {
     await renderUserAdmin();
     return;
   }
+  if (menuId === "settings") {
+    await renderBackgroundSettings();
+    return;
+  }
   await renderModule(menu);
 }
 
@@ -248,6 +254,170 @@ function renderDashboard() {
   $$("[data-quick-menu]").forEach(button => {
     button.addEventListener("click", () => navigate(button.dataset.quickMenu));
   });
+}
+
+
+async function loadBackground() {
+  try {
+    const data = await api("/api/settings/background", { allowUnauthorized: true });
+    state.backgroundUrl = data.backgroundUrl || "";
+    applyBackground(state.backgroundUrl);
+  } catch (_) {
+    applyBackground("");
+  }
+}
+
+function applyBackground(url) {
+  const image = $("#siteBackgroundImage");
+  image.classList.remove("loaded");
+
+  image.onload = () => image.classList.add("loaded");
+  image.onerror = () => {
+    image.classList.remove("loaded");
+    image.removeAttribute("src");
+  };
+
+  if (url) {
+    image.referrerPolicy = "no-referrer";
+    image.src = url;
+  } else {
+    image.removeAttribute("src");
+  }
+}
+
+async function renderBackgroundSettings() {
+  pageContent.innerHTML = loadingHtml();
+
+  try {
+    const data = await api("/api/settings/background", { allowUnauthorized: true });
+    state.backgroundUrl = data.backgroundUrl || "";
+    const editable = Boolean(state.user?.isMaster);
+
+    pageContent.innerHTML = `
+      <section class="background-settings-grid">
+        <article class="background-form-card">
+          <span class="eyebrow">GLASS APPEARANCE</span>
+          <h3>Ganti background dari link</h3>
+          <p>Tempel link gambar HTTPS. Setelah disimpan, background login dan dashboard langsung berubah untuk semua akun.</p>
+
+          <form id="backgroundForm" class="background-url-row">
+            <label>
+              Link gambar background
+              <input id="backgroundUrlInput" type="url" maxlength="2048"
+                placeholder="https://contoh.com/background.jpg"
+                value="${escapeHtml(state.backgroundUrl)}"
+                ${editable ? "" : "disabled"}>
+            </label>
+
+            <div id="backgroundMessage" class="form-message hidden"></div>
+
+            <div class="background-actions">
+              <button id="previewBackgroundButton" class="secondary-button" type="button">
+                Lihat preview
+              </button>
+              ${editable ? `
+                <button id="resetBackgroundButton" class="secondary-button" type="button">
+                  Pakai background bawaan
+                </button>
+                <button id="saveBackgroundButton" class="primary-button" type="submit">
+                  Simpan background
+                </button>
+              ` : ""}
+            </div>
+          </form>
+
+          <div class="settings-note">
+            Gunakan link langsung gambar yang diawali <strong>https://</strong>, misalnya file JPG, PNG, WebP, atau GIF.
+            Hindari link halaman Google Drive/Pinterest karena biasanya bukan link gambar langsung.
+          </div>
+
+          ${editable ? "" : `
+            <div class="settings-note">
+              Hanya akun master yang dapat mengubah background global.
+            </div>
+          `}
+        </article>
+
+        <article class="background-preview-card">
+          <span class="eyebrow">LIVE PREVIEW</span>
+          <h3>Preview efek kaca</h3>
+          <p>Panel tetap terbaca karena memakai lapisan gelap dan blur.</p>
+          <div class="background-preview">
+            ${state.backgroundUrl ? `
+              <img id="backgroundPreviewImage" src="${escapeHtml(state.backgroundUrl)}"
+                   alt="Preview background" referrerpolicy="no-referrer">
+            ` : ""}
+            <div class="preview-glass-card">
+              <strong>TheMoon</strong>
+              <span>Glassmorphism aktif dengan background yang dapat diganti dari link.</span>
+            </div>
+          </div>
+        </article>
+      </section>`;
+
+    const input = $("#backgroundUrlInput");
+    const preview = $(".background-preview");
+
+    $("#previewBackgroundButton").addEventListener("click", () => {
+      const value = input.value.trim();
+      updateBackgroundPreview(preview, value);
+      applyBackground(value);
+    });
+
+    if (editable) {
+      $("#resetBackgroundButton").addEventListener("click", async () => {
+        input.value = "";
+        await saveBackgroundUrl("", $("#resetBackgroundButton"));
+      });
+
+      $("#backgroundForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        await saveBackgroundUrl(input.value.trim(), $("#saveBackgroundButton"));
+      });
+    }
+  } catch (error) {
+    pageContent.innerHTML = errorState(error.message);
+  }
+}
+
+function updateBackgroundPreview(container, url) {
+  const oldImage = container.querySelector("img");
+  if (oldImage) oldImage.remove();
+
+  if (!url) return;
+
+  const image = document.createElement("img");
+  image.alt = "Preview background";
+  image.referrerPolicy = "no-referrer";
+  image.src = url;
+  image.onerror = () => {
+    image.remove();
+    toast("Link tidak dapat menampilkan gambar. Coba link gambar langsung lain.", "error");
+  };
+  container.prepend(image);
+}
+
+async function saveBackgroundUrl(backgroundUrl, button) {
+  hideFormMessage("#backgroundMessage");
+  setLoading(button, true, "Menyimpan...");
+
+  try {
+    const data = await api("/api/settings/background", {
+      method: "PUT",
+      body: { backgroundUrl }
+    });
+    state.backgroundUrl = data.backgroundUrl || "";
+    applyBackground(state.backgroundUrl);
+    toast(
+      state.backgroundUrl ? "Background berhasil diganti." : "Background bawaan berhasil dipakai.",
+      "success"
+    );
+    await renderBackgroundSettings();
+  } catch (error) {
+    showFormMessage("#backgroundMessage", error.message);
+  } finally {
+    setLoading(button, false);
+  }
 }
 
 async function renderModule(menu) {
