@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07101f">
+  <title>TheMoon Control Panel</title>
+  <link rel="stylesheet" href="/styles.css?v=3.0.0">
+</head>
+<body>
+  <img id="siteBackground" class="site-background" alt="" referrerpolicy="no-referrer">
+  <div class="background-shade"></div>
+  <div class="aurora aurora-a"></div>
+  <div class="aurora aurora-b"></div>
+
+  <main id="loginView" class="login-page">
+    <section class="login-card glass">
+      <div class="login-intro">
+        <div class="logo-box">◐</div>
+        <span class="kicker">SECURE CONTROL CENTER</span>
+        <h1>TheMoon</h1>
+        <p>Kelola akun, hak akses, dan seluruh menu operasional melalui satu panel.</p>
+
+        <div class="intro-points">
+          <div><span>✓</span> Password disimpan sebagai hash</div>
+          <div><span>✓</span> Hak akses diperiksa oleh server</div>
+          <div><span>✓</span> Background dapat diganti melalui link</div>
+        </div>
+      </div>
+
+      <div class="login-form-panel">
+        <div class="mobile-logo"><span class="logo-box small">◐</span><strong>TheMoon</strong></div>
+        <span class="kicker">SELAMAT DATANG</span>
+        <h2>Masuk ke panel</h2>
+        <p class="muted">Gunakan akun yang sudah didaftarkan.</p>
+
+        <form id="loginForm">
+          <label>
+            Username
+            <div class="input-box">
+              <span>◎</span>
+              <input id="loginUsername" autocomplete="username" maxlength="40"
+                     placeholder="Masukkan username" required>
+            </div>
+          </label>
+
+          <label>
+            Password
+            <div class="input-box">
+              <span>◆</span>
+              <input id="loginPassword" type="password" autocomplete="current-password"
+                     maxlength="128" placeholder="Masukkan password" required>
+              <button class="plain-icon" type="button" data-toggle-password="loginPassword"
+                      aria-label="Tampilkan password">◉</button>
+            </div>
+          </label>
+
+          <div id="loginMessage" class="message hidden"></div>
+
+          <button id="loginButton" class="btn btn-primary btn-full" type="submit">
+            Masuk sekarang <span>→</span>
+          </button>
+        </form>
+
+        <p class="login-note">🔒 Sesi menggunakan cookie aman HttpOnly.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="appView" class="app hidden">
+    <aside id="sidebar" class="sidebar glass">
+      <div class="side-brand">
+        <span class="logo-box small">◐</span>
+        <div><strong>TheMoon</strong><small>Control Panel</small></div>
+        <button id="closeSidebar" class="icon-btn mobile-only" type="button">×</button>
+      </div>
+
+      <nav id="menuList" class="menu-list"></nav>
+
+      <div class="side-footer">
+        <div id="sideUser"></div>
+        <button id="logoutButton" class="btn btn-ghost btn-full" type="button">Keluar</button>
+      </div>
+    </aside>
+
+    <div id="sidebarOverlay" class="sidebar-overlay hidden"></div>
+
+    <section class="workspace">
+      <header class="topbar glass">
+        <div class="top-left">
+          <button id="openSidebar" class="icon-btn mobile-only" type="button">☰</button>
+          <div><span class="kicker">THEMOON SYSTEM</span><h2 id="pageTitle">Dashboard</h2></div>
+        </div>
+        <div class="top-actions">
+          <span class="online"><i></i> Online</span>
+          <button id="accountButton" class="account-button" type="button"></button>
+        </div>
+      </header>
+
+      <div id="pageContent" class="page-content"></div>
+    </section>
+  </div>
+
+  <div id="userModal" class="modal hidden">
+    <section class="modal-card glass wide">
+      <header class="modal-head">
+        <div><span class="kicker">USER MANAGEMENT</span><h3 id="userModalTitle">Tambah akun</h3></div>
+        <button class="icon-btn" type="button" data-close-modal="userModal">×</button>
+      </header>
+
+      <form id="userForm">
+        <input id="editUserId" type="hidden">
+
+        <div class="form-grid">
+          <label>Username
+            <input id="userUsername" minlength="3" maxlength="40"
+                   placeholder="contoh: operator01" required>
+          </label>
+          <label>Password <small id="passwordHint" class="muted"></small>
+            <input id="userPassword" type="password" minlength="6" maxlength="128"
+                   placeholder="minimal 6 karakter">
+          </label>
+        </div>
+
+        <div class="switch-row">
+          <div><strong>Status akun</strong><small>Akun nonaktif tidak dapat login.</small></div>
+          <label class="switch">
+            <input id="userActive" type="checkbox" checked>
+            <span></span>
+          </label>
+        </div>
+
+        <section class="permission-box">
+          <header>
+            <div><strong>Hak akses menu</strong><small>Pilih menu yang dapat dibuka akun ini.</small></div>
+            <div>
+              <button id="selectAllPermissions" class="link-btn" type="button">Pilih semua</button>
+              <button id="clearPermissions" class="link-btn" type="button">Kosongkan</button>
+            </div>
+          </header>
+          <div id="permissionGrid" class="permission-grid"></div>
+        </section>
+
+        <div id="userMessage" class="message hidden"></div>
+
+        <footer class="modal-actions">
+          <button class="btn btn-secondary" type="button" data-close-modal="userModal">Batal</button>
+          <button id="saveUserButton" class="btn btn-primary" type="submit">Simpan akun</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div id="passwordModal" class="modal hidden">
+    <section class="modal-card glass">
+      <header class="modal-head">
+        <div><span class="kicker">KEAMANAN</span><h3>Ganti password</h3></div>
+        <button class="icon-btn" type="button" data-close-modal="passwordModal">×</button>
+      </header>
+
+      <form id="passwordForm">
+        <label>Password sekarang<input id="currentPassword" type="password" required></label>
+        <label>Password baru<input id="newPassword" type="password" minlength="8" maxlength="128" required></label>
+        <label>Ulangi password baru<input id="confirmPassword" type="password" minlength="8" maxlength="128" required></label>
+        <div id="passwordMessage" class="message hidden"></div>
+        <footer class="modal-actions">
+          <button class="btn btn-secondary" type="button" data-close-modal="passwordModal">Batal</button>
+          <button class="btn btn-primary" type="submit">Ubah password</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div id="confirmModal" class="modal hidden">
+    <section class="modal-card glass compact">
+      <div class="confirm-symbol">!</div>
+      <h3 id="confirmTitle">Hapus akun?</h3>
+      <p id="confirmText" class="muted"></p>
+      <footer class="modal-actions centered">
+        <button class="btn btn-secondary" type="button" data-close-modal="confirmModal">Batal</button>
+        <button id="confirmButton" class="btn btn-danger" type="button">Hapus</button>
+      </footer>
+    </section>
+  </div>
+
+  <div id="toastArea" class="toast-area"></div>
+  <script src="/app.js?v=3.0.0" defer></script>
+</body>
+</html>
